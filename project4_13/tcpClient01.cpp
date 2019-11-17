@@ -75,22 +75,70 @@ size_t readn(int fd, void *vptr, size_t n)
     return n - nleft;
 }
 
-void str_client(FILE *fp, int sockfd)
+size_t readline(int fd, void *vptr, size_t maxlen)
 {
-    char sendl[MAX_BUFFER], recvl[MAX_BUFFER];
-    while(fgets(sendl, MAX_BUFFER, fp) != NULL)
+    size_t n,rc;
+    char c,*ptr;
+    ptr = (char*)vptr;
+    for(n = 1; n < maxlen; n++)
     {
-        writen(sockfd, sendl, strlen(sendl));
-
-        if(readn(sockfd, recvl, MAX_BUFFER) < 0)
+        if((rc = read(fd, &c, 1)) == 1)
         {
-            printf("str_client read error:%s(errno:%d)\n", strerror(errno), errno);
+            *ptr++ = c;
+            if(c == '\n')
+            {
+                break;
+            }
+        }
+        else if(rc == 0)
+        {
+            *ptr = 0;
+            return (n - 1);
         }
         else
         {
-            printf("read from server:%s", recvl);
+            if(errno != EINTR)
+            {
+                return -1;
+            }
         }
     }
+
+    *ptr = 0;
+    return n;
+}
+
+void str_client(FILE *fp, int sockfd)
+{
+    int datan = 0;
+    char sendl[MAX_BUFFER], recvl[MAX_BUFFER];
+    while(1)
+    {
+        if(fgets(sendl, MAX_BUFFER, fp) != NULL)
+        {
+            printf("fgets data:%s\n", sendl);
+            datan = writen(sockfd, sendl, strlen(sendl));
+            if (datan > 0)
+            {
+                printf("writen data:%s(len:%d)\n", sendl, datan);
+            }
+
+            datan = readline(sockfd, recvl, MAX_BUFFER);
+            if( datan < 0)
+            {
+                printf("str_client read error:%s(errno:%d)\n", strerror(errno), errno);
+            }
+            else
+            {
+                printf("read from server:%s(len:%d)\n", recvl, datan);
+            }
+        }
+        else
+        {
+            printf("fget error:%s(errno:%d)\n", strerror(errno), errno);
+        }
+    }
+    
 }
 
 int main(int argc, char **argv)

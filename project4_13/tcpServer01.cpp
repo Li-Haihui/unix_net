@@ -15,13 +15,38 @@
 #define LISTEN_NUM (10)
 #define MAX_BUFFER (1024)
 
+size_t writen(int fd, const void *vptr, size_t n)
+{
+    size_t nleft;
+    size_t nwritten;
+    const char *ptr;
+
+    ptr = (char*)vptr;
+    nleft = n;
+    while(nleft > 0)
+    {
+        if((nwritten = write(fd, ptr, nleft)) <= 0)
+        {
+            if((nwritten < 0) && errno == EINTR)
+            {
+                nwritten = 0;
+            }
+            else
+                return -1;
+        }
+
+        nleft = nleft - nwritten;
+        ptr = ptr + nwritten;
+    }
+    return n;
+}
 
 int main(int argc, char **argv)
 {
     int sockfd, connfd;
     int ret;
     struct sockaddr_in serverAddr, clientAddr;
-    char buff[MAX_BUFFER];
+    char readl[MAX_BUFFER], writel[MAX_BUFFER], buff[MAX_BUFFER];
     time_t ticks;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -69,12 +94,16 @@ int main(int argc, char **argv)
                 printf("connection from %s, prot %d\n", 
                     inet_ntop(AF_INET, &clientAddr.sin_addr, buff, sizeof(buff)), ntohs(clientAddr.sin_port));
 
-                int datalen = read(connfd, buff,MAX_BUFFER);
+                int datalen = read(connfd, readl,MAX_BUFFER);
                 printf("read data:%s", buff);
     
                 ticks = time(NULL);
-                snprintf(buff, sizeof(buff), "%.24s\r\n", ctime(&ticks));
-                write(connfd, buff, strlen(buff));
+                snprintf(writel, sizeof(writel), "%.24s\r\n", ctime(&ticks));
+                datalen = writen(connfd, writel, strlen(writel));
+                if(datalen > 0)
+                {
+                    printf("writen data:%s(len:%d)\n", writel, datalen);
+                }
                 
             }      
         }
